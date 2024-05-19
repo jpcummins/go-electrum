@@ -14,7 +14,10 @@ func (s *Client) Ping(ctx context.Context) error {
 // ServerAddPeer adds your new server into the remote server own peers list.
 // This should not be used if you are a client.
 // https://electrumx.readthedocs.io/en/latest/protocol-methods.html#server-add-peer
-func (s *Client) ServerAddPeer(ctx context.Context, features *ServerFeaturesResult) error {
+func (s *Client) ServerAddPeer(
+	ctx context.Context,
+	features *ServerFeaturesResult,
+) error {
 	var resp basicResp
 
 	err := s.request(ctx, "server.add_peer", []interface{}{features}, &resp)
@@ -66,7 +69,9 @@ type ServerFeaturesResult struct {
 
 // ServerFeatures returns a list of features and services supported by the remote server.
 // https://electrumx.readthedocs.io/en/latest/protocol-methods.html#server-features
-func (s *Client) ServerFeatures(ctx context.Context) (*ServerFeaturesResult, error) {
+func (s *Client) ServerFeatures(
+	ctx context.Context,
+) (*ServerFeaturesResult, error) {
 	var resp ServerFeaturesResp
 
 	err := s.request(ctx, "server.features", []interface{}{}, &resp)
@@ -93,10 +98,26 @@ type ServerVersionResp struct {
 // ServerVersion identify the client to the server, and negotiate the protocol version.
 // This call must be sent first, or the server will default to an older protocol version.
 // https://electrumx.readthedocs.io/en/latest/protocol-methods.html#server-version
-func (s *Client) ServerVersion(ctx context.Context) (serverVer, protocolVer string, err error) {
+func (s *Client) ServerVersion(
+	ctx context.Context,
+	clientVersion, protocolVersion string,
+) (serverVer, protocolVer string, err error) {
 	var resp ServerVersionResp
 
-	err = s.request(ctx, "server.version", []interface{}{ClientVersion, ProtocolVersion}, &resp)
+	if clientVersion == "" {
+		clientVersion = ClientVersion
+	}
+
+	if protocolVersion == "" {
+		protocolVersion = ProtocolVersion
+	}
+
+	err = s.request(
+		ctx,
+		"server.version",
+		[]interface{}{clientVersion, protocolVersion},
+		&resp,
+	)
 	if err != nil {
 		serverVer = ""
 		protocolVer = ""

@@ -1,9 +1,10 @@
 package electrum
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestAddressToElectrumScriptHash(t *testing.T) {

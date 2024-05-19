@@ -8,14 +8,21 @@ import (
 	"github.com/jpcummins/go-electrum/electrum"
 )
 
-func main() {
-	client, err := electrum.NewClientTCP(context.Background(), "bch.imaginary.cash:50001")
+func TestServer() {
+	client, err := electrum.NewClientTCP(
+		context.Background(),
+		"bch.imaginary.cash:50001",
+	)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	serverVer, protocolVer, err := client.ServerVersion(context.Background())
+	serverVer, protocolVer, err := client.ServerVersion(
+		context.Background(),
+		"",
+		"1.4.2",
+	)
 	if err != nil {
 		log.Fatal(err)
 	}

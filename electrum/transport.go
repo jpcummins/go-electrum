@@ -16,9 +16,33 @@ type TCPTransport struct {
 	errors    chan error
 }
 
+// DialerOption is a function that configures a TCPTransport.
+type DialerOption func(*net.Dialer)
+
+func withOptions(opts map[string]interface{}) []DialerOption {
+	var options []DialerOption
+	for k, v := range opts {
+		switch k {
+		case "timeout":
+			options = append(options, func(d *net.Dialer) {
+				d.Timeout = v.(time.Duration)
+			})
+		}
+	}
+	return options
+}
+
 // NewTCPTransport opens a new TCP connection to the remote server.
-func NewTCPTransport(ctx context.Context, addr string) (*TCPTransport, error) {
-	var d net.Dialer
+func NewTCPTransport(
+	ctx context.Context,
+	addr string,
+	options ...DialerOption,
+) (*TCPTransport, error) {
+	var d = net.Dialer{}
+
+	for _, option := range options {
+		option(&d)
+	}
 
 	conn, err := d.DialContext(ctx, "tcp", addr)
 	if err != nil {
@@ -37,10 +61,18 @@ func NewTCPTransport(ctx context.Context, addr string) (*TCPTransport, error) {
 }
 
 // NewSSLTransport opens a new SSL connection to the remote server.
-func NewSSLTransport(ctx context.Context, addr string, config *tls.Config) (*TCPTransport, error) {
+func NewSSLTransport(
+	ctx context.Context,
+	addr string,
+	config *tls.Config,
+	options ...DialerOption,
+) (*TCPTransport, error) {
 	dialer := tls.Dialer{
 		NetDialer: &net.Dialer{},
 		Config:    config,
+	}
+	for _, option := range options {
+		option(dialer.NetDialer)
 	}
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
@@ -69,7 +101,12 @@ func (t *TCPTransport) listen() {
 			break
 		}
 		if DebugMode {
-			log.Printf("%s [debug] %s -> %s", time.Now().Format("2006-01-02 15:04:05"), t.conn.RemoteAddr(), line)
+			log.Printf(
+				"%s [debug] %s -> %s",
+				time.Now().Format("2006-01-02 15:04:05"),
+				t.conn.RemoteAddr(),
+				line,
+			)
 		}
 
 		t.responses <- line
@@ -79,7 +116,12 @@ func (t *TCPTransport) listen() {
 // SendMessage sends a message to the remote server through the TCP transport.
 func (t *TCPTransport) SendMessage(body []byte) error {
 	if DebugMode {
-		log.Printf("%s [debug] %s <- %s", time.Now().Format("2006-01-02 15:04:05"), t.conn.RemoteAddr(), body)
+		log.Printf(
+			"%s [debug] %s <- %s",
+			time.Now().Format("2006-01-02 15:04:05"),
+			t.conn.RemoteAddr(),
+			body,
+		)
 	}
 
 	_, err := t.conn.Write(body)
