@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 const (
@@ -56,13 +55,6 @@ type container struct {
 	err     error
 }
 
-type Logger interface {
-	Debugf(format string, v ...interface{})
-	Infof(format string, v ...interface{})
-	Warnf(format string, v ...interface{})
-	Errorf(format string, v ...interface{})
-}
-
 // Client stores information about the remote server.
 type Client struct {
 	transport Transport
@@ -77,27 +69,6 @@ type Client struct {
 	quit  chan struct{}
 
 	nextID uint64
-
-	// txCache
-	txCache *TxCache
-
-	logger Logger
-
-	timeout time.Duration
-}
-
-type ClientOption func(*Client)
-
-func WithTimeout(timeout time.Duration) ClientOption {
-	return func(c *Client) {
-		c.timeout = timeout
-	}
-}
-
-func WithLogger(logger Logger) ClientOption {
-	return func(c *Client) {
-		c.logger = logger
-	}
 }
 
 // NewClient initializes a new client for remote server and connects to it using
@@ -123,12 +94,8 @@ func NewClient(ctx context.Context, urlStr string, tlsConfig *tls.Config) (*Clie
 }
 
 // NewClientTCP initialize a new client for remote server and connects to the remote server using TCP
-func NewClientTCP(
-	ctx context.Context,
-	addr string,
-	options ...ClientOption,
-) (*Client, error) {
-	txCache, err := NewTxCache(nil)
+func NewClientTCP(ctx context.Context, addr string) (*Client, error) {
+	transport, err := NewTCPTransport(ctx, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -139,23 +106,6 @@ func NewClientTCP(
 
 		Error: make(chan error),
 		quit:  make(chan struct{}),
-
-		logger: newLogger(),
-
-		txCache: txCache,
-	}
-
-	for _, option := range options {
-		option(c)
-	}
-
-	dialerOptions := withOptions(map[string]interface{}{
-		"timeout": c.timeout,
-	})
-
-	transport, err := NewTCPTransport(ctx, addr, dialerOptions...)
-	if err != nil {
-		return nil, err
 	}
 
 	c.transport = transport
@@ -165,13 +115,8 @@ func NewClientTCP(
 }
 
 // NewClientSSL initialize a new client for remote server and connects to the remote server using SSL
-func NewClientSSL(
-	ctx context.Context,
-	addr string,
-	config *tls.Config,
-	options ...ClientOption,
-) (*Client, error) {
-	txCache, err := NewTxCache(nil)
+func NewClientSSL(ctx context.Context, addr string, config *tls.Config) (*Client, error) {
+	transport, err := NewSSLTransport(ctx, addr, config)
 	if err != nil {
 		return nil, err
 	}
@@ -182,22 +127,6 @@ func NewClientSSL(
 
 		Error: make(chan error),
 		quit:  make(chan struct{}),
-
-		logger:  newLogger(),
-		txCache: txCache,
-	}
-
-	for _, option := range options {
-		option(c)
-	}
-
-	dialerOptions := withOptions(map[string]interface{}{
-		"timeout": c.timeout,
-	})
-
-	transport, err := NewSSLTransport(ctx, addr, config, dialerOptions...)
-	if err != nil {
-		return nil, err
 	}
 
 	c.transport = transport
@@ -287,9 +216,6 @@ func (s *Client) listen() {
 			return
 		case err := <-s.transport.Errors():
 			s.Error <- err
-			s.transport = nil
-			s.handlers = nil
-			s.pushHandlers = nil
 			s.Shutdown()
 		case bytes := <-s.transport.Responses():
 			result := &container{
@@ -302,12 +228,9 @@ func (s *Client) listen() {
 				if DebugMode {
 					log.Printf("unmarshal received message [%s] failed: [%v]", bytes, err)
 				}
-				result.err = fmt.Errorf(
-					"Unmarshal received message failed: %v",
-					err,
-				)
+				result.err = fmt.Errorf("Unmarshal received message failed: %v", err)
 			} else if msg.Error != nil {
-				result.err = errors.New(msg.Error.Message)
+				result.err = msg.Error
 			}
 
 			if len(msg.Method) > 0 {
@@ -350,12 +273,7 @@ type request struct {
 	Params []interface{} `json:"params"`
 }
 
-func (s *Client) request(
-	ctx context.Context,
-	method string,
-	params []interface{},
-	v interface{},
-) error {
+func (s *Client) request(ctx context.Context, method string, params []interface{}, v interface{}) error {
 	select {
 	case <-s.quit:
 		return ErrServerShutdown
@@ -421,12 +339,9 @@ func (s *Client) Shutdown() {
 	if s.transport != nil {
 		_ = s.transport.Close()
 	}
-	if (s.txCache) != nil {
-		s.txCache.Close()
-	}
-	// s.transport = nil
-	// s.handlers = nil
-	// s.pushHandlers = nil
+	s.transport = nil
+	s.handlers = nil
+	s.pushHandlers = nil
 }
 
 func (s *Client) IsShutdown() bool {

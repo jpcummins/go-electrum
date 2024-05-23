@@ -29,34 +29,3 @@ func AddressToElectrumScriptHash(addressStr string) (string, error) {
 
 	return hex.EncodeToString(hashSum[:]), nil
 }
-
-// GetTotalSentAndReceived returns the total sent and received for a scripthash.
-func GetTotalSentAndReceived(
-	address string,
-	history []*DetailedMempoolResult,
-) (float64, float64) {
-	var totalSent, totalReceived float64
-	for _, tx := range history {
-		if tx.Incoming {
-			findAddressFunc[Vout](
-				address,
-				tx.Vout,
-				func(elem Vout, index int) bool {
-					totalReceived += elem.Value
-					return true
-				},
-			)
-		} else {
-			findAddressFunc[VinWithPrevout](
-				address,
-				tx.Vin,
-				func(elem VinWithPrevout, index int) bool {
-					totalSent += elem.Prevout.Value
-					return true
-				},
-			)
-		}
-	}
-
-	return totalSent, totalReceived
-}

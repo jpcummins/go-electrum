@@ -17,12 +17,7 @@ type GetFeeResp struct {
 func (s *Client) GetFee(ctx context.Context, target uint32) (float32, error) {
 	var resp GetFeeResp
 
-	err := s.request(
-		ctx,
-		"blockchain.estimatefee",
-		[]interface{}{target},
-		&resp,
-	)
+	err := s.request(ctx, "blockchain.estimatefee", []interface{}{target}, &resp)
 	if err != nil {
 		return -1, err
 	}
@@ -52,9 +47,7 @@ type getFeeHistogramResp struct {
 // GetFeeHistogram returns a histogram of the fee rates paid by transactions in the
 // memory pool, weighted by transacation size.
 // https://electrumx.readthedocs.io/en/latest/protocol-methods.html#mempool-get-fee-histogram
-func (s *Client) GetFeeHistogram(
-	ctx context.Context,
-) (map[uint32]uint64, error) {
+func (s *Client) GetFeeHistogram(ctx context.Context) (map[uint32]uint64, error) {
 	var resp getFeeHistogramResp
 
 	err := s.request(ctx, "mempool.get_fee_histogram", []interface{}{}, &resp)

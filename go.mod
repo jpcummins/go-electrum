@@ -6,9 +6,7 @@ require (
 	github.com/btcsuite/btcd v0.24.0
 	github.com/btcsuite/btcd/btcutil v1.1.5
 	github.com/gorilla/websocket v1.5.0
-	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/stretchr/testify v1.8.0
-	golang.org/x/sync v0.7.0
 )
 
 require (
